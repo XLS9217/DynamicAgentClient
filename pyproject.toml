@@ -1,0 +1,4 @@
+# Package config for dynamic-agent-client.
+# This is a pip-installable SDK that other services (e.g. AgenticNoteTakingBE)
+# install to communicate with dynamic_agent_service.
+# Declares dependencies: websockets, httpx, pydantic.
