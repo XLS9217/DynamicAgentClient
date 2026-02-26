@@ -88,6 +88,34 @@ def agent_tool(description: str = ""):
     return decorator
 
 
+def description(func: Callable) -> Callable:
+    """
+    Decorator to mark a method as the operator's description provider.
+    The method must take only self and return a str.
+    Used to supply the agent's system prompt description.
+    """
+    sig = inspect.signature(func)
+    params = list(sig.parameters.keys())
+    if not params or params[0] != 'self':
+        raise ValueError("@description can only decorate class methods")
+    func._is_operator_description = True
+    return func
+
+
+def flow(func: Callable) -> Callable:
+    """
+    Decorator to mark a method as the operator's flow provider.
+    The method must take only self and return a str.
+    Used to supply the agent's step-by-step flow instructions.
+    """
+    sig = inspect.signature(func)
+    params = list(sig.parameters.keys())
+    if not params or params[0] != 'self':
+        raise ValueError("@flow can only decorate class methods")
+    func._is_operator_flow = True
+    return func
+
+
 class AgentOperator(ABC):
     """
     Base class for operators that provide tools to the agent.
@@ -96,10 +124,12 @@ class AgentOperator(ABC):
 
     def __init__(self):
         self._tools: dict[str, dict] = {}
+        self._description_func = None
+        self._flow_func = None
         self._collect_tools()
 
     def _collect_tools(self):
-        """Find all @agent_tool methods on this instance"""
+        """Find all @agent_tool, @description, and @flow methods on this instance"""
         for name in dir(self):
             if name.startswith('_'):
                 continue
@@ -122,7 +152,27 @@ class AgentOperator(ABC):
                 }
                 logger.info(f"Collected tool: {name}")
 
+            elif hasattr(func, '_is_operator_description'):
+                self._description_func = attr
+                logger.info(f"Collected description: {name}")
+
+            elif hasattr(func, '_is_operator_flow'):
+                self._flow_func = attr
+                logger.info(f"Collected flow: {name}")
+
         logger.info(f"Total tools collected: {len(self._tools)}")
+
+    def get_description(self) -> str | None:
+        """Call the @description method and return its string, or None if not defined."""
+        if self._description_func:
+            return self._description_func()
+        return None
+
+    def get_flow(self) -> str | None:
+        """Call the @flow method and return its string, or None if not defined."""
+        if self._flow_func:
+            return self._flow_func()
+        return None
 
     def get_tools(self) -> list:
         """Get all tools in OpenAI format"""
