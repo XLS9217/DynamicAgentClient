@@ -2,19 +2,23 @@
 This acts as a final wrapper to user
 """
 import asyncio
+import json
+
 import requests
 import websockets
 
-import json
+from dynamic_agent_client.src.operator.agent_operator_base import AgentOperator
 from dynamic_agent_client.src.session_client_structs import ClientInvokeMessage
 
 
 class DynamicAgentClient:
 
     def __init__(self, server_addr: str):
-
+        """
+        :param server_addr: Full base URL including scheme, e.g. "http://localhost:8000" or "https://example.com"
+        """
         # session
-        self.server_addr = server_addr
+        self.server_addr = server_addr.rstrip("/")
         self.session_id: str | None = None
         self.websocket = None
 
@@ -32,7 +36,7 @@ class DynamicAgentClient:
         instance = cls(server_addr)
 
         # HTTP call to create session and init AGI
-        resp = requests.post(f"http://{server_addr}/create_session", json={"setting": setting})
+        resp = requests.post(f"{instance.server_addr}/create_session", json={"setting": setting})
         resp.raise_for_status()
         data = resp.json()
         instance.session_id = data["session_id"]
@@ -84,8 +88,21 @@ class DynamicAgentClient:
 
     async def add_operator(self, operator):
         """
-        this will
-        1. extract the name of operator put in the self dict
-        2. get serialized json send to service via post agent_operator endpoint
+        1. Serialize the operator and store locally by name
+        2. POST the serialized JSON to the service's /agent_operator endpoint
         """
-        pass
+        if not isinstance(operator, AgentOperator):
+            raise TypeError("operator must be an AgentOperator instance")
+
+        serialized = operator.get_serialized_operator()
+        self.operator_dict[serialized.name] = operator
+
+        resp = requests.post(
+            f"{self.server_addr}/agent_operator",
+            json={
+                "session_id": self.session_id,
+                "operator": serialized.model_dump(),
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
