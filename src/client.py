@@ -24,6 +24,9 @@ class DynamicAgentClient:
         self._response_done = asyncio.Event()
         self._listen_task = None
 
+        # operator
+        self.operator_dict = {} # operator_name : operator_instance
+
     @classmethod
     async def create(cls, setting: str, server_addr: str) -> "DynamicAgentClient":
         instance = cls(server_addr)
@@ -79,5 +82,10 @@ class DynamicAgentClient:
             await self.websocket.close()
             self.websocket = None
 
-    async def add_operator(self):
+    async def add_operator(self, operator):
+        """
+        this will
+        1. extract the name of operator put in the self dict
+        2. get serialized json send to service via post agent_operator endpoint
+        """
         pass

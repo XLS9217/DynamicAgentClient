@@ -1,11 +1,12 @@
 
-import asyncio
 import inspect
-import json
 import re
 from abc import ABC
 from typing import Callable, get_type_hints
 from logging import getLogger
+
+from pydantic import BaseModel
+
 logger = getLogger(__name__)
 
 def _parse_docstring_params(docstring: str | None) -> dict[str, str]:
@@ -115,6 +116,14 @@ def flow(func: Callable) -> Callable:
     func._is_operator_flow = True
     return func
 
+class SerializedOperatorStructure(BaseModel):
+    """
+    Work with service's operator handler
+    """
+    name: str # name of class
+    tools: list[dict] #openai tools schema
+    description: str | None = None # description of the operator
+    flows: list[dict[str,str]] | None = None # each individual flow, yes, there could be multiple flow, flow_name: flow_text
 
 class AgentOperator(ABC):
     """
@@ -125,7 +134,7 @@ class AgentOperator(ABC):
     def __init__(self):
         self._tools: dict[str, dict] = {}
         self._description_func = None
-        self._flow_func = None
+        self._flow_funcs: list[tuple[str, Callable]] = []
         self._collect_tools()
 
     def _collect_tools(self):
@@ -147,7 +156,6 @@ class AgentOperator(ABC):
 
             if hasattr(func, '_agent_tool_schema'):
                 self._tools[name] = {
-                    "func": attr,
                     "schema": func._agent_tool_schema,
                 }
                 logger.info(f"Collected tool: {name}")
@@ -157,78 +165,22 @@ class AgentOperator(ABC):
                 logger.info(f"Collected description: {name}")
 
             elif hasattr(func, '_is_operator_flow'):
-                self._flow_func = attr
+                self._flow_funcs.append((name, attr))
                 logger.info(f"Collected flow: {name}")
 
         logger.info(f"Total tools collected: {len(self._tools)}")
 
-    def get_description(self) -> str | None:
-        """Call the @description method and return its string, or None if not defined."""
-        if self._description_func:
-            return self._description_func()
-        return None
+    def get_serialized_operator(self) -> SerializedOperatorStructure:
+        """Serialize this operator into a SerializedOperatorStructure."""
+        tools = [{"type": "function", "function": t["schema"]} for t in self._tools.values()]
 
-    def get_flow(self) -> str | None:
-        """Call the @flow method and return its string, or None if not defined."""
-        if self._flow_func:
-            return self._flow_func()
-        return None
+        desc = self._description_func() if self._description_func else None
 
-    def get_tools(self) -> list:
-        """Get all tools in OpenAI format"""
-        return [{"type": "function", "function": t["schema"]} for t in self._tools.values()]
+        flows = [{name: func()} for name, func in self._flow_funcs] if self._flow_funcs else None
 
-    def get_tools_with_ref(self) -> list:
-        """Get all tools with operator reference for execution"""
-        return [
-            {"type": "function", "function": t["schema"], "_operator": self, "_func_name": name}
-            for name, t in self._tools.items()
-        ]
-
-    def _sanitize_json_load(self, arguments: str) -> dict | str:
-        """Parse JSON with fallback sanitization for control characters. Returns dict or error string."""
-        try:
-            return json.loads(arguments)
-        except json.JSONDecodeError as json_err:
-            # Escape raw newlines/tabs inside strings, remove other control chars
-            cleaned = arguments.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-            cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', cleaned)
-            if cleaned != arguments:
-                logger.warning(f"Sanitized JSON: escaped newlines/tabs or removed control chars")
-                try:
-                    return json.loads(cleaned)
-                except json.JSONDecodeError as retry_err:
-                    logger.error(f"JSON parse error after sanitize: {retry_err}")
-                    return f"Error: Invalid JSON - {str(retry_err)}"
-            logger.error(f"JSON parse error: {json_err}")
-            logger.error(f"Raw arguments: {repr(arguments)}")
-            return f"Error: Invalid JSON - {str(json_err)}"
-
-    async def execute_tool(self, name: str, arguments: str):
-        """Execute a tool by name"""
-        if name not in self._tools:
-            logger.warning(f"Tool '{name}' not found")
-            return f"Error: Tool '{name}' not found"
-
-        func = self._tools[name]["func"]
-        try:
-            if not arguments:
-                args = {}
-            else:
-                args = self._sanitize_json_load(arguments)
-                if isinstance(args, str):
-                    return args
-
-            logger.info(f"Executing tool: {name} with args: {args}")
-
-            if asyncio.iscoroutinefunction(func):
-                result = await func(**args)
-            else:
-                result = func(**args)
-
-            logger.info(f"Tool '{name}' completed")
-            return result
-        except Exception as e:
-            logger.error(f"Error executing tool '{name}': {e}")
-            logger.error(f"Tool parameters: {arguments}")
-            return f"Error executing tool '{name}': {str(e)}"
+        return SerializedOperatorStructure(
+            name=self.__class__.__name__,
+            tools=tools,
+            description=desc,
+            flows=flows,
+        )
