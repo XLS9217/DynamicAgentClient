@@ -20,9 +20,9 @@ class DynamicAgentClient:
 
         # agent response
         self._on_stream = None
-        self._on_finish = None
         self._accumulated_text = ""
         self._response_done = asyncio.Event()
+        self._listen_task = None
 
     @classmethod
     async def create(cls, setting: str, server_addr: str) -> "DynamicAgentClient":
@@ -39,7 +39,7 @@ class DynamicAgentClient:
         print(f"Connecting to {socket_url}")
         instance.websocket = await websockets.connect(socket_url)
 
-        asyncio.ensure_future(instance._listen())
+        instance._listen_task = asyncio.ensure_future(instance._listen())
         return instance
 
     async def _listen(self):
@@ -52,27 +52,29 @@ class DynamicAgentClient:
                     self._on_stream(data["text"])
 
                 if data.get("finished"):
-                    if self._on_finish:
-                        self._on_finish(self._accumulated_text)
-                    self._accumulated_text = ""
+                    print("Response finished")
                     self._response_done.set()
 
     async def trigger(
         self,
         text: str,
         on_stream=None,  # called with each chunk's text
-        on_finish=None,  # called with the full accumulated text when done
     ):
         self._on_stream = on_stream
-        self._on_finish = on_finish
         self._accumulated_text = ""
         self._response_done.clear()
 
         msg = ClientInvokeMessage(text=text)
         await self.websocket.send(msg.model_dump_json())
         await self._response_done.wait()
+        result = self._accumulated_text
+        self._accumulated_text = ""
+        return result
 
     async def close(self):
+        if self._listen_task:
+            self._listen_task.cancel()
+            self._listen_task = None
         if self.websocket:
             await self.websocket.close()
             self.websocket = None
