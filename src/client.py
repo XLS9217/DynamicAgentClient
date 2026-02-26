@@ -5,46 +5,72 @@ import asyncio
 import requests
 import websockets
 
+import json
 from dynamic_agent_client.src.session_client_structs import ClientInvokeMessage
-from dynamic_agent_service.service.session_service_structs import AgentResponseMessage, AgentResponseChunk
 
 
 class DynamicAgentClient:
 
     def __init__(self, server_addr: str):
+
+        # session
         self.server_addr = server_addr
         self.session_id: str | None = None
         self.websocket = None
+
+        # agent response
+        self._on_stream = None
+        self._on_finish = None
+        self._accumulated_text = ""
+        self._response_done = asyncio.Event()
 
     @classmethod
     async def create(cls, setting: str, server_addr: str) -> "DynamicAgentClient":
         instance = cls(server_addr)
 
         # HTTP call to create session and init AGI
-        resp = requests.post(f"{server_addr}/create_session", json={"setting": setting})
+        resp = requests.post(f"http://{server_addr}/create_session", json={"setting": setting})
         resp.raise_for_status()
-        instance.session_id = resp.json()["session_id"]
+        data = resp.json()
+        instance.session_id = data["session_id"]
+        socket_url = data["socket_url"]
 
-        # Connect websocket with session_id
-        ws_addr = server_addr.replace("http://", "ws://")
-        instance.websocket = await websockets.connect(f"{ws_addr}/agent_session?session_id={instance.session_id}")
+        # Connect websocket using url provided by server
+        print(f"Connecting to {socket_url}")
+        instance.websocket = await websockets.connect(socket_url)
 
         asyncio.ensure_future(instance._listen())
         return instance
 
-    async def trigger(self, text: str):
+    async def _listen(self):
+        """Continuously receive and handle AgentResponseChunk messages from the server."""
+        async for message in self.websocket:
+            data = json.loads(message)
+            if data.get("type") == "agent_chunk":
+                self._accumulated_text += data["text"]
+                if self._on_stream:
+                    self._on_stream(data["text"])
+
+                if data.get("finished"):
+                    if self._on_finish:
+                        self._on_finish(self._accumulated_text)
+                    self._accumulated_text = ""
+                    self._response_done.set()
+
+    async def trigger(
+        self,
+        text: str,
+        on_stream=None,  # called with each chunk's text
+        on_finish=None,  # called with the full accumulated text when done
+    ):
+        self._on_stream = on_stream
+        self._on_finish = on_finish
+        self._accumulated_text = ""
+        self._response_done.clear()
+
         msg = ClientInvokeMessage(text=text)
         await self.websocket.send(msg.model_dump_json())
-
-    async def _listen(self):
-        """Print all incoming websocket messages continuously."""
-        async for raw in self.websocket:
-            if '"agent_chunk"' in raw:
-                chunk = AgentResponseChunk.model_validate_json(raw)
-                print(chunk.text, end="", flush=True)
-            else:
-                msg = AgentResponseMessage.model_validate_json(raw)
-                print(f"\n[done] {msg.text}")
+        await self._response_done.wait()
 
     async def close(self):
         if self.websocket:
