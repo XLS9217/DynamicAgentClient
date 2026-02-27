@@ -36,6 +36,7 @@ class DynamicAgentClient:
 
         self._webhook_port = None
         self._webhook_server = None
+        self._webhook_task = None
 
     async def _start_webhook_server(self):
         """Start FastAPI server for tool execution."""
@@ -68,10 +69,10 @@ class DynamicAgentClient:
             except Exception as e:
                 return {"error": str(e)}
 
-        config = uvicorn.Config(app, host="0.0.0.0", port=self._webhook_port, log_level="error")
+        config = uvicorn.Config(app, host="0.0.0.0", port=self._webhook_port, log_level="error", lifespan="off")
         server = uvicorn.Server(config)
         self._webhook_server = server
-        asyncio.create_task(server.serve())
+        self._webhook_task = asyncio.create_task(server.serve())
 
     @classmethod
     async def create(cls, setting: str, server_addr: str) -> "DynamicAgentClient":
@@ -100,16 +101,21 @@ class DynamicAgentClient:
 
     async def _listen(self):
         """Continuously receive and handle messages from the server."""
-        async for message in self.websocket:
-            data = json.loads(message)
-            if data.get("type") == "agent_chunk":
-                self._accumulated_text += data["text"]
-                if self._on_stream:
-                    self._on_stream(data["text"])
+        try:
+            async for message in self.websocket:
+                data = json.loads(message)
+                if data.get("type") == "agent_chunk":
+                    self._accumulated_text += data["text"]
+                    if self._on_stream:
+                        self._on_stream(data["text"])
 
-                if data.get("finished"):
-                    print("Response finished")
-                    self._response_done.set()
+                    if data.get("finished"):
+                        print("Response finished")
+                        self._response_done.set()
+        except websockets.exceptions.ConnectionClosed:
+            pass
+        except asyncio.CancelledError:
+            pass
 
     async def trigger(
         self,
@@ -130,10 +136,39 @@ class DynamicAgentClient:
     async def close(self):
         if self._listen_task:
             self._listen_task.cancel()
+            try:
+                await self._listen_task
+            except asyncio.CancelledError:
+                pass
             self._listen_task = None
+
         if self.websocket:
             await self.websocket.close()
             self.websocket = None
+
+        if hasattr(self, '_webhook_server') and self._webhook_server:
+            self._webhook_server.should_exit = True
+            if self._webhook_task:
+                try:
+                    await self._webhook_task
+                except asyncio.CancelledError:
+                    pass
+                self._webhook_task = None
+            self._webhook_server = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
+    def __del__(self):
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.close())
+        except Exception:
+            pass
 
     async def add_operator(self, operator):
         """
