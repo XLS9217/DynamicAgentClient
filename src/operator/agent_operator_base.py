@@ -157,6 +157,7 @@ class AgentOperator(ABC):
             if hasattr(func, '_agent_tool_schema'):
                 self._tools[name] = {
                     "schema": func._agent_tool_schema,
+                    "callable": attr,
                 }
                 logger.info(f"Collected tool: {name}")
 
@@ -184,3 +185,11 @@ class AgentOperator(ABC):
             description=desc,
             flows=flows,
         )
+
+    def execute(self, tool_name: str, arguments: dict):
+        """Execute a tool by name with given arguments."""
+        if tool_name not in self._tools:
+            raise ValueError(f"Tool {tool_name} not found in operator")
+
+        callable_func = self._tools[tool_name]["callable"]
+        return callable_func(**arguments)
