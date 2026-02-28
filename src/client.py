@@ -29,10 +29,10 @@ class DynamicAgentClient:
 
         self._on_stream = None
         self._accumulated_text = ""
-        self._response_done = asyncio.Event()
+        self._response_done = asyncio.Event() # handle for accumulated trigger
         self._listen_task = None
 
-        self.operator_dict = {}
+        self.tool_map = {}  # {prefixed_tool_name: callable}
 
         self._webhook_port = None
         self._webhook_server = None
@@ -49,7 +49,6 @@ class DynamicAgentClient:
             data = await request.json()
             tool_name = data.get("name", "")
             arguments = json.loads(data.get("arguments", "{}"))
-            operator_name = data.get("operator_name")
 
             # Parse string arguments that look like JSON
             for key, value in arguments.items():
@@ -59,15 +58,12 @@ class DynamicAgentClient:
                     except (json.JSONDecodeError, ValueError):
                         pass  # Keep as string if not valid JSON
 
-            operator = client.operator_dict.get(operator_name)
-            if not operator:
-                return {"error": f"Operator {operator_name} not found"}
+            callable_func = client.tool_map.get(tool_name)
+            if not callable_func:
+                return {"error": f"Tool {tool_name} not found"}
 
-            try:
-                result = operator.execute(tool_name, arguments)
-                return str(result)
-            except Exception as e:
-                return {"error": str(e)}
+            result = callable_func(**arguments)
+            return str(result)
 
         config = uvicorn.Config(app, host="0.0.0.0", port=self._webhook_port, log_level="error", lifespan="off")
         server = uvicorn.Server(config)
@@ -172,14 +168,18 @@ class DynamicAgentClient:
 
     async def add_operator(self, operator):
         """
-        1. Serialize the operator and store locally by name
+        1. Serialize the operator, build tool_map entries with prefixed names
         2. POST the serialized JSON to the service's /agent_operator endpoint
         """
         if not isinstance(operator, AgentOperator):
             raise TypeError("operator must be an AgentOperator instance")
 
         serialized = operator.get_serialized_operator()
-        self.operator_dict[serialized.name] = operator
+
+        # Build flat tool_map: prefixed_name -> callable
+        for tool_name, tool_info in operator._tools.items():
+            prefixed_name = f"{serialized.name}_{tool_name}"
+            self.tool_map[prefixed_name] = tool_info["callable"]
 
         resp = requests.post(
             f"{self.server_addr}/agent_operator",

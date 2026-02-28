@@ -173,14 +173,19 @@ class AgentOperator(ABC):
 
     def get_serialized_operator(self) -> SerializedOperatorStructure:
         """Serialize this operator into a SerializedOperatorStructure."""
-        tools = [{"type": "function", "function": t["schema"]} for t in self._tools.values()]
+        class_name = self.__class__.__name__
+        tools = []
+        for t in self._tools.values():
+            schema = dict(t["schema"])
+            schema["name"] = f"{class_name}_{schema['name']}"
+            tools.append({"type": "function", "function": schema})
 
         desc = self._description_func() if self._description_func else None
 
         flows = [{name: func()} for name, func in self._flow_funcs] if self._flow_funcs else None
 
         return SerializedOperatorStructure(
-            name=self.__class__.__name__,
+            name=class_name,
             tools=tools,
             description=desc,
             flows=flows,
