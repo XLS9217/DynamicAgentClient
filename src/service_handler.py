@@ -4,12 +4,23 @@ All clients go through ServiceHandler — one webhook port for all sessions.
 """
 import asyncio
 import json
+import re
 import socket
 
-import requests
+import httpx
 import uvicorn
 import websockets
 from fastapi import FastAPI, Request as FastAPIRequest
+
+
+def _make_httpx_client() -> httpx.AsyncClient:
+    """Create an httpx client that bypasses proxy for http:// targets."""
+    return httpx.AsyncClient(mounts={"http://": None})
+
+
+def _sanitize_json(raw: str) -> str:
+    """Fix common LLM JSON quirks like leading zeros (e.g. 00.5 -> 0.5)."""
+    return re.sub(r'(?<![0-9])0+(\d+\.)', r'\1', raw)
 
 
 class ServiceHandler:
@@ -27,6 +38,7 @@ class ServiceHandler:
     _port: int = None
     _server_addr: str = None
     _clients: dict = {}  # session_id -> DynamicAgentClient
+    _http: httpx.AsyncClient = None
 
     @classmethod
     async def connect(cls, server_addr: str):
@@ -35,6 +47,8 @@ class ServiceHandler:
         Subsequent calls with same address are a no-op.
         """
         cls._server_addr = server_addr.rstrip("/")
+        if cls._http is None:
+            cls._http = _make_httpx_client()
         if cls._server is None:
             await cls._start_webhook_server()
 
@@ -43,7 +57,7 @@ class ServiceHandler:
         """
         POST /create_session to the service, register client, return (session_id, websocket).
         """
-        resp = requests.post(
+        resp = await cls._http.post(
             f"{cls._server_addr}/create_session",
             json={"setting": setting, "webhook_port": cls._port},
         )
@@ -70,7 +84,7 @@ class ServiceHandler:
             prefixed_name = f"{serialized.name}_{tool_name}"
             client.tool_map[prefixed_name] = tool_info["callable"]
 
-        resp = requests.post(
+        resp = await cls._http.post(
             f"{cls._server_addr}/agent_operator",
             json={
                 "session_id": session_id,
@@ -96,7 +110,7 @@ class ServiceHandler:
             client = cls._clients.get(session_id)
 
             tool_name = data.get("name", "")
-            arguments = json.loads(data.get("arguments", "{}"))
+            arguments = json.loads(_sanitize_json(data.get("arguments", "{}")))
 
             for key, value in arguments.items():
                 if isinstance(value, str):
@@ -125,6 +139,9 @@ class ServiceHandler:
 
     @classmethod
     async def stop(cls):
+        if cls._http:
+            await cls._http.aclose()
+            cls._http = None
         if cls._server:
             cls._server.should_exit = True
             if cls._server_task:
