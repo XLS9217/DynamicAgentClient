@@ -19,7 +19,7 @@ ssd_chat = [
     {"role": "assistant", "content": "Good call. Keep an eye on deal sites too, flash sales still pop up occasionally."},
 ]
 
-ssd_chat_cn_100 = [
+ssd_chat_cn_79 = [
     {"role": "user", "content": "嘿，你最近关注 SSD 的价格了吗？感觉一直在涨。"},
     {"role": "assistant", "content": "是的，过去几个月 SSD 价格确实一直在攀升。主要是 NAND 闪存的供应变紧缺了。"},
     {"role": "user", "content": "是什么导致了供应短缺？"},
