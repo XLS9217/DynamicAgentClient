@@ -50,7 +50,7 @@ class MathOperator(AgentOperator):
         """
         # print(f"cross_product Received vectors: {vector_a} and {vector_b}")
         if len(vector_a) != 3 or len(vector_b) != 3:
-            raise ValueError("Cross product requires 3D vectors")
+            raise ValueError(f"Cross product requires 3D vectors input is {vector_a} and {vector_b}")
         a1, a2, a3 = vector_a
         b1, b2, b3 = vector_b
         return [
@@ -138,16 +138,19 @@ async def main():
     result = await client.add_operator(op)
     print(f"Operator registered: {result}")
 
+    def on_invoke(text: str):
+        print(text)
+
     # 3. Test cross then dot
     prompt, expected = generate_cross_then_dot_example()
-    response = await client.trigger(prompt)
+    response = await client.trigger(prompt, on_invoke=on_invoke)
     print(f"Prompt: {prompt}")
     print(f"Expected: {expected}")
     print(f"Response: {response}\n")
 
     # 4. Test triangle normal angle
     prompt, expected = generate_triangle_example()
-    response = await client.trigger(prompt)
+    response = await client.trigger(prompt, on_invoke=on_invoke)
     print(f"Prompt: {prompt}")
     print(f"Expected: {expected}")
     print(f"Response: {response}")

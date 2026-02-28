@@ -3,6 +3,7 @@ This acts as a final wrapper to user
 """
 import asyncio
 import json
+from typing import Callable
 
 import websockets
 
@@ -17,8 +18,11 @@ class DynamicAgentClient:
         self.session_id: str | None = None
         self.websocket = None
 
-        self._on_stream = None
+        self._on_stream: Callable[[str], None] | None = None
+        self._on_invoke: Callable[[str], None] | None = None
+        self._on_compact: Callable[[bool], None] | None = None
         self._accumulated_text = ""
+        self._invoke_text = ""
         self._response_done = asyncio.Event()
         self._listen_task = None
 
@@ -44,12 +48,24 @@ class DynamicAgentClient:
             async for message in self.websocket:
                 data = json.loads(message)
                 if data.get("type") == "agent_chunk":
-                    self._accumulated_text += data["text"]
-                    if self._on_stream:
-                        self._on_stream(data["text"])
+                    text = data["text"]
+
+                    if text:
+                        self._accumulated_text += text
+                        self._invoke_text += text
+                        if self._on_stream:
+                            self._on_stream(text)
+
+                    if data.get("invoked"):
+                        if self._on_invoke:
+                            self._on_invoke(self._invoke_text)
+                        self._invoke_text = ""
+
+                    if data.get("compacting") is not None:
+                        if self._on_compact:
+                            self._on_compact(data["compacting"])
 
                     if data.get("finished"):
-                        print("Response finished")
                         self._response_done.set()
         except websockets.exceptions.ConnectionClosed:
             pass
@@ -59,10 +75,15 @@ class DynamicAgentClient:
     async def trigger(
         self,
         text: str,
-        on_stream=None,
+        on_stream: Callable[[str], None] = None,
+        on_invoke: Callable[[str], None] = None,
+        on_compact: Callable[[bool], None] = None,
     ):
         self._on_stream = on_stream
+        self._on_invoke = on_invoke
+        self._on_compact = on_compact
         self._accumulated_text = ""
+        self._invoke_text = ""
         self._response_done.clear()
 
         msg = ClientInvokeMessage(text=text)

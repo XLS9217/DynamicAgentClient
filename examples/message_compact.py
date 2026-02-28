@@ -29,9 +29,13 @@ async def main():
     def on_stream(chunk: str):
         print(chunk, end="", flush=True)
 
+    def on_compact(compacting: bool):
+        print("(compacting start)" if compacting else "(compacting end)", end="", flush=True)
+
     response = await client.trigger(
         "根据我们之前的对话，用3个要点总结SSD涨价的关键信息。",
         on_stream=on_stream,
+        on_compact=on_compact,
     )
     print()
 
