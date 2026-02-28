@@ -53,13 +53,19 @@ class ServiceHandler:
             await cls._start_webhook_server()
 
     @classmethod
-    async def create_session(cls, setting: str, client, messages: list = None) -> tuple:
+    async def create_session(cls, setting: str, client, messages: list = None, compact_limit: int = None, compact_target: int = None) -> tuple:
         """
         POST /create_session to the service, register client, return (session_id, websocket).
         """
         resp = await cls._http.post(
             f"{cls._server_addr}/create_session",
-            json={"setting": setting, "webhook_port": cls._port, "messages": messages or []},
+            json={
+                "setting": setting,
+                "webhook_port": cls._port,
+                "messages": messages or [],
+                "compact_limit": compact_limit,
+                "compact_target": compact_target,
+            },
         )
         resp.raise_for_status()
         data = resp.json()
