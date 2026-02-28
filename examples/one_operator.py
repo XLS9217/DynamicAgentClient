@@ -1,3 +1,6 @@
+"""
+uv run -m dynamic_agent_client.examples.one_operator
+"""
 import asyncio
 import json
 import sys
@@ -11,8 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 load_dotenv()
 
-from dynamic_agent_client.src.client import DynamicAgentClient
-from dynamic_agent_client.src.operator.agent_operator_base import AgentOperator, agent_tool, description, flow
+from dynamic_agent_client import DynamicAgentClient, AgentOperator, agent_tool, description, flow
 
 
 class MathOperator(AgentOperator):

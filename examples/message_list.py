@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from dynamic_agent_client.examples.test_messages import ssd_chat
-from dynamic_agent_client.src.client import DynamicAgentClient
+from dynamic_agent_client import DynamicAgentClient
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
