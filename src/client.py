@@ -30,9 +30,9 @@ class DynamicAgentClient:
         await ServiceHandler.connect(server_addr)
 
     @classmethod
-    async def create(cls, setting: str) -> "DynamicAgentClient":
+    async def create(cls, setting: str, messages: list = None) -> "DynamicAgentClient":
         instance = cls()
-        instance.session_id, instance.websocket = await ServiceHandler.create_session(setting, instance)
+        instance.session_id, instance.websocket = await ServiceHandler.create_session(setting, instance, messages=messages or [])
         instance._listen_task = asyncio.ensure_future(instance._listen())
         return instance
 
