@@ -7,9 +7,9 @@ from typing import Callable
 
 import websockets
 
-from dynamic_agent_client.src.operator.agent_operator_base import AgentOperator
-from dynamic_agent_client.src.session_client_structs import ClientInvokeMessage
-from dynamic_agent_client.src.service_handler import ServiceHandler
+from dynamic_agent_client.operator.agent_operator_base import AgentOperator
+from dynamic_agent_client.session_client_structs import ClientInvokeMessage
+from dynamic_agent_client.service_handler import ServiceHandler
 
 
 class DynamicAgentClient:

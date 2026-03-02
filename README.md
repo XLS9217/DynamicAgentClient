@@ -9,7 +9,7 @@ Python SDK for communicating with the DynamicAgent service.
 You can install directly from GitHub using `pip`:
 
 ```bash
-pip install "dynamic-agent-client @ git+https://github.com/XLS9217/DynamicAgent.git#subdirectory=dynamic_agent_client"
+pip install "dynamic-agent-client @ git+https://github.com/XLS9217/DynamicAgentClient.git"
 ```
 
 Note: If you have issues with `#subdirectory` fragment, ensure you are using a recent version of `pip`.
@@ -19,12 +19,12 @@ Note: If you have issues with `#subdirectory` fragment, ensure you are using a r
 If you are using `uv`, you can add it as a dependency by specifying the Git URL with the subdirectory:
 
 ```bash
-uv add "dynamic-agent-client @ git+https://github.com/XLS9217/DynamicAgent.git" --subdirectory dynamic_agent_client
+uv add "dynamic-agent-client @ git+https://github.com/XLS9217/DynamicAgentClient.git"
 ```
 
 Note: If you are using an older version of `uv`, you might need to use the fragment syntax:
 ```bash
-uv add "dynamic-agent-client @ git+https://github.com/XLS9217/DynamicAgent.git#subdirectory=dynamic_agent_client"
+uv add "dynamic-agent-client @ git+https://github.com/XLS9217/DynamicAgentClient.git"
 ```
 
 ## Quick Start
