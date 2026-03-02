@@ -86,7 +86,7 @@ def generate_cross_then_dot_example():
     cross = op.cross_product(a, b)
     dot = op.dot_product(cross, c)
 
-    prompt = f"Calculate the cross product of {a} and {b}, then calculate the dot product of the result and {c}. respond the answer directly"
+    prompt = f"Calculate the cross product of {a} and {b}, then calculate the dot product of the result and {c}. respond the answer"
     return prompt, dot
 
 
