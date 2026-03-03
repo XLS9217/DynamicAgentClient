@@ -25,6 +25,8 @@ class DynamicAgentClient:
         self._invoke_text = ""
         self._response_done = asyncio.Event()
         self._listen_task = None
+        self._connected = True
+        self._needs_reconnect = True
 
         self.tool_map = {}  # {prefixed_tool_name: callable}
 
@@ -34,16 +36,17 @@ class DynamicAgentClient:
         await ServiceHandler.connect(server_addr)
 
     @classmethod
-    async def create(cls, setting: str, messages: list = None, compact_limit: int = 40, compact_target: int = 20) -> "DynamicAgentClient":
+    async def create(cls, setting: str, messages: list = None, compact_limit: int = 40, compact_target: int = 20, reconnect_keep: int = 30) -> "DynamicAgentClient":
+        """Create a new session with the Dynamic Agent service."""
         instance = cls()
         instance.session_id, instance.websocket = await ServiceHandler.create_session(
-            setting, instance, messages=messages or [], compact_limit=compact_limit, compact_target=compact_target
+            setting, instance, messages=messages or [], compact_limit=compact_limit, compact_target=compact_target, reconnect_keep=reconnect_keep
         )
         instance._listen_task = asyncio.ensure_future(instance._listen())
         return instance
 
     async def _listen(self):
-        """Continuously receive and handle messages from the server."""
+        """Listen for messages from server. Sets _connected=False on disconnect."""
         try:
             async for message in self.websocket:
                 data = json.loads(message)
@@ -72,6 +75,8 @@ class DynamicAgentClient:
         except asyncio.CancelledError:
             pass
 
+        self._connected = False
+
     async def trigger(
         self,
         text: str,
@@ -79,6 +84,8 @@ class DynamicAgentClient:
         on_invoke: Callable[[str], None] = None,
         on_compact: Callable[[bool], None] = None,
     ):
+        await self._ensure_connected()
+
         self._on_stream = on_stream
         self._on_invoke = on_invoke
         self._on_compact = on_compact
@@ -98,7 +105,42 @@ class DynamicAgentClient:
             raise TypeError("operator must be an AgentOperator instance")
         return await ServiceHandler.add_operator(self.session_id, self, operator)
 
+    async def _ensure_connected(self):
+        """Ensure websocket is connected, reconnect if needed."""
+        if self._connected:
+            return
+
+        if not self._needs_reconnect:
+            raise Exception("Connection closed and reconnect disabled")
+
+        print("Connection lost. Reconnecting...")
+        if self._listen_task:
+            self._listen_task.cancel()
+            try:
+                await self._listen_task
+            except asyncio.CancelledError:
+                pass
+
+        self.websocket = await ServiceHandler.reconnect_session(self.session_id)
+        self._connected = True
+        self._listen_task = asyncio.ensure_future(self._listen())
+        print("Reconnected successfully!")
+
+    async def _reconnect(self) -> bool:
+        """Attempt to reconnect to existing session. Returns True if successful."""
+        if self.session_id is None:
+            return False
+        try:
+            print(f"Attempting to reconnect to session {self.session_id}...")
+            self.websocket = await ServiceHandler.reconnect_session(self.session_id)
+            print("Reconnection successful!")
+            return True
+        except Exception as e:
+            print(f"Reconnection failed: {e}")
+            return False
+
     async def close(self):
+        self._needs_reconnect = False
         if self._listen_task:
             self._listen_task.cancel()
             try:

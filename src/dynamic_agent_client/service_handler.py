@@ -53,7 +53,7 @@ class ServiceHandler:
             await cls._start_webhook_server()
 
     @classmethod
-    async def create_session(cls, setting: str, client, messages: list = None, compact_limit: int = None, compact_target: int = None) -> tuple:
+    async def create_session(cls, setting: str, client, messages: list = None, compact_limit: int = None, compact_target: int = None, reconnect_keep: int = 30) -> tuple:
         """
         POST /create_session to the service, register client, return (session_id, websocket).
         """
@@ -65,6 +65,7 @@ class ServiceHandler:
                 "messages": messages or [],
                 "compact_limit": compact_limit,
                 "compact_target": compact_target,
+                "reconnect_keep": reconnect_keep,
             },
         )
         resp.raise_for_status()
@@ -99,6 +100,15 @@ class ServiceHandler:
         )
         resp.raise_for_status()
         return resp.json()
+
+    @classmethod
+    async def reconnect_session(cls, session_id: str):
+        """Reconnect to existing session by session_id, returns websocket."""
+        socket_url = f"{cls._server_addr.replace('http', 'ws')}/agent_session?session_id={session_id}"
+        print(f"Connecting to: {socket_url}")
+        ws = await asyncio.wait_for(websockets.connect(socket_url), timeout=5.0)
+        print(f"WebSocket connected!")
+        return ws
 
     @classmethod
     def unregister_client(cls, session_id: str):
