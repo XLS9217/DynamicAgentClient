@@ -1,6 +1,6 @@
 [project]
 name = "dynamic-agent-client"
-version = "0.1.0"
+version = "0.1.1"
 description = "WebSocket + HTTP client library for consuming the dynamic agent service"
 requires-python = ">=3.13"
 dependencies = [
