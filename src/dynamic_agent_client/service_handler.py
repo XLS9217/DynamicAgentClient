@@ -102,6 +102,16 @@ class ServiceHandler:
         return resp.json()
 
     @classmethod
+    async def trigger(cls, session_id: str, text: str):
+        """Trigger agent with text input via HTTP POST."""
+        resp = await cls._http.post(
+            f"{cls._server_addr}/trigger",
+            json={"session_id": session_id, "text": text},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @classmethod
     async def reconnect_session(cls, session_id: str):
         """Reconnect to existing session by session_id, returns websocket."""
         socket_url = f"{cls._server_addr.replace('http', 'ws')}/agent_session?session_id={session_id}"

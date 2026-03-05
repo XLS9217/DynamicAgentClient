@@ -8,7 +8,6 @@ from typing import Callable
 import websockets
 
 from .operator.agent_operator_base import AgentOperator
-from .session_client_structs import ClientInvokeMessage
 from .service_handler import ServiceHandler
 
 
@@ -93,8 +92,9 @@ class DynamicAgentClient:
         self._invoke_text = ""
         self._response_done.clear()
 
-        msg = ClientInvokeMessage(text=text)
-        await self.websocket.send(msg.model_dump_json())
+        # Fire HTTP trigger, response streams via WebSocket
+        await ServiceHandler.trigger(self.session_id, text)
+        # Wait for streaming response to complete
         await self._response_done.wait()
         result = self._accumulated_text
         self._accumulated_text = ""
