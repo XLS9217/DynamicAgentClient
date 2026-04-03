@@ -53,7 +53,7 @@ class ServiceHandler:
             await cls._start_webhook_server()
 
     @classmethod
-    async def create_session(cls, setting: str, client, messages: list = None, compact_limit: int = None, compact_target: int = None, reconnect_keep: int = 30) -> tuple:
+    async def create_session(cls, setting: str, client, messages: list = None, compact_limit: int = None, compact_target: int = None, reconnect_keep: int = 30, bucket_name: str = None) -> tuple:
         """
         POST /create_session to the service, register client, return (session_id, websocket).
         """
@@ -66,6 +66,7 @@ class ServiceHandler:
                 "compact_limit": compact_limit,
                 "compact_target": compact_target,
                 "reconnect_keep": reconnect_keep,
+                "bucket_name": bucket_name,
             },
         )
         resp.raise_for_status()
