@@ -98,6 +98,31 @@ class DynamicAgentClient:
             raise TypeError("operator must be an AgentOperator instance")
         return await ServiceHandler.add_operator(self.session_id, self, operator)
 
+    @classmethod
+    async def create_bucket(cls, name: str, description: str = ""):
+        """Create a new bucket for storing knowledge."""
+        return await ServiceHandler.create_bucket(name, description)
+
+    @classmethod
+    async def check_bucket(cls, name: str):
+        """Check if a bucket exists."""
+        return await ServiceHandler.check_bucket(name)
+
+    @classmethod
+    async def delete_bucket(cls, name: str):
+        """Delete a bucket and all its contents."""
+        return await ServiceHandler.delete_bucket(name)
+
+    @classmethod
+    async def inbound(cls, instruction_query: str, knowledge_text: str, bucket_name: str):
+        """Inbound knowledge into a bucket."""
+        return await ServiceHandler.inbound(instruction_query, knowledge_text, bucket_name)
+
+    @classmethod
+    async def retrieve(cls, query: str, bucket_name: str, top_k: int = 10):
+        """Retrieve knowledge from a bucket."""
+        return await ServiceHandler.retrieve(query, bucket_name, top_k)
+
     async def _ensure_connected(self):
         """Ensure websocket is connected, reconnect if needed."""
         if self._connected:

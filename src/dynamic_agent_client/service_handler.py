@@ -111,6 +111,66 @@ class ServiceHandler:
         return resp.json()
 
     @classmethod
+    async def create_bucket(cls, name: str, description: str = ""):
+        """Create a new bucket via HTTP POST."""
+        resp = await cls._http.post(
+            f"{cls._server_addr}/knowledge/bucket",
+            json={
+                "name": name,
+                "description": description,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @classmethod
+    async def check_bucket(cls, name: str):
+        """Check if a bucket exists via HTTP GET."""
+        resp = await cls._http.get(
+            f"{cls._server_addr}/knowledge/bucket/{name}",
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @classmethod
+    async def delete_bucket(cls, name: str):
+        """Delete a bucket via HTTP DELETE."""
+        resp = await cls._http.delete(
+            f"{cls._server_addr}/knowledge/bucket/{name}",
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @classmethod
+    async def inbound(cls, instruction_query: str, knowledge_text: str, bucket_name: str):
+        """Inbound knowledge into a bucket via HTTP POST."""
+        resp = await cls._http.post(
+            f"{cls._server_addr}/knowledge/inbound",
+            json={
+                "instruction_query": instruction_query,
+                "knowledge_text": knowledge_text,
+                "bucket_name": bucket_name,
+            },
+            timeout=300.0,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @classmethod
+    async def retrieve(cls, query: str, bucket_name: str, top_k: int = 10):
+        """Retrieve knowledge from a bucket via HTTP POST."""
+        resp = await cls._http.post(
+            f"{cls._server_addr}/knowledge/retrieve",
+            json={
+                "query": query,
+                "bucket_name": bucket_name,
+                "top_k": top_k,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @classmethod
     async def reconnect_session(cls, session_id: str):
         """Reconnect to existing session by session_id, returns websocket."""
         socket_url = f"{cls._server_addr.replace('http', 'ws')}/agent_session?session_id={session_id}"
