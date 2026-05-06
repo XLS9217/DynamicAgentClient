@@ -19,7 +19,6 @@ class DynamicAgentClient:
 
         self._on_stream: Callable[[str], None] | None = None
         self._on_invoke: Callable[[str], None] | None = None
-        self._on_compact: Callable[[bool], None] | None = None
         self._accumulated_text = ""
         self._invoke_text = ""
         self._response_done = asyncio.Event()
@@ -35,11 +34,11 @@ class DynamicAgentClient:
         await ServiceHandler.connect(server_addr)
 
     @classmethod
-    async def create(cls, setting: str, messages: list = None, compact_limit: int = 40, compact_target: int = 20, reconnect_keep: int = 30, bucket_name: str = None) -> "DynamicAgentClient":
+    async def create(cls, setting: str, messages: list = None, reconnect_keep: int = 30, bucket_name: str = None) -> "DynamicAgentClient":
         """Create a new session with the Dynamic Agent service."""
         instance = cls()
         instance.session_id, instance.websocket = await ServiceHandler.create_session(
-            setting, instance, messages=messages or [], compact_limit=compact_limit, compact_target=compact_target, reconnect_keep=reconnect_keep, bucket_name=bucket_name
+            setting, instance, messages=messages or [], reconnect_keep=reconnect_keep, bucket_name=bucket_name
         )
         instance._listen_task = asyncio.ensure_future(instance._listen())
         return instance
@@ -63,10 +62,6 @@ class DynamicAgentClient:
                             self._on_invoke(self._invoke_text)
                         self._invoke_text = ""
 
-                    if data.get("compacting") is not None:
-                        if self._on_compact:
-                            self._on_compact(data["compacting"])
-
                     if data.get("finished"):
                         self._response_done.set()
         except websockets.exceptions.ConnectionClosed:
@@ -81,13 +76,11 @@ class DynamicAgentClient:
         text: str,
         on_stream: Callable[[str], None] = None,
         on_invoke: Callable[[str], None] = None,
-        on_compact: Callable[[bool], None] = None,
     ):
         await self._ensure_connected()
 
         self._on_stream = on_stream
         self._on_invoke = on_invoke
-        self._on_compact = on_compact
         self._accumulated_text = ""
         self._invoke_text = ""
         self._response_done.clear()
