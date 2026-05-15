@@ -144,6 +144,8 @@ class ServiceHandler:
     @classmethod
     async def inbound(cls, instruction_query: str, knowledge_text: str, bucket_name: str):
         """Inbound knowledge into a bucket via HTTP POST."""
+        # TO-DO: For large texts this can exceed the timeout. Design an async approach
+        # (e.g. return task_id immediately, push result via WebSocket channel).
         resp = await cls._http.post(
             f"{cls._server_addr}/knowledge/inbound",
             json={
