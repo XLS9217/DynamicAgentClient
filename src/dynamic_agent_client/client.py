@@ -19,7 +19,6 @@ class DynamicAgentClient:
 
         self._on_stream: Callable[[str], None] | None = None
         self._on_invoke: Callable[[str], None] | None = None
-        self._on_rag: Callable[[list], None] | None = None
         self._accumulated_text = ""
         self._invoke_text = ""
         self._response_done = asyncio.Event()
@@ -49,10 +48,7 @@ class DynamicAgentClient:
         try:
             async for message in self.websocket:
                 data = json.loads(message)
-                if data.get("type") == "rag_context":
-                    if self._on_rag:
-                        self._on_rag(data.get("knowledge", []))
-                elif data.get("type") == "agent_chunk":
+                if data.get("type") == "agent_chunk":
                     text = data["text"]
 
                     if text:
@@ -80,13 +76,11 @@ class DynamicAgentClient:
         text: str,
         on_stream: Callable[[str], None] = None,
         on_invoke: Callable[[str], None] = None,
-        on_rag: Callable[[list], None] = None,
     ):
         await self._ensure_connected()
 
         self._on_stream = on_stream
         self._on_invoke = on_invoke
-        self._on_rag = on_rag
         self._accumulated_text = ""
         self._invoke_text = ""
         self._response_done.clear()
