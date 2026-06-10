@@ -2,7 +2,7 @@
 name = "dynamic-agent-client"
 version = "0.1.2"
 description = "WebSocket + HTTP client library for consuming the dynamic agent service"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0",
     "websockets>=12.0",
