@@ -53,18 +53,16 @@ class ServiceHandler:
             await cls._start_webhook_server()
 
     @classmethod
-    async def create_session(cls, setting: str, client, messages: list = None, reconnect_keep: int = 30, bucket_name: str = None) -> tuple:
+    async def create_session(cls, setting: str, client, reconnect_keep: int = 30) -> tuple:
         """
-        POST /create_session to the service, register client, return (session_id, websocket).
+        POST /create_session to the service, register client, return (session_id, websocket, messages).
         """
         resp = await cls._http.post(
             f"{cls._server_addr}/create_session",
             json={
                 "setting": setting,
                 "webhook_port": cls._port,
-                "messages": messages or [],
                 "reconnect_keep": reconnect_keep,
-                "bucket_name": bucket_name,
             },
         )
         resp.raise_for_status()
@@ -72,11 +70,12 @@ class ServiceHandler:
 
         session_id = data["session_id"]
         socket_url = data["socket_url"]
+        messages = data["messages"]
 
         cls._clients[session_id] = client
 
         ws = await websockets.connect(socket_url)
-        return session_id, ws
+        return session_id, ws, messages
 
     @classmethod
     async def add_operator(cls, session_id: str, client, operator):
@@ -101,11 +100,11 @@ class ServiceHandler:
         return resp.json()
 
     @classmethod
-    async def trigger(cls, session_id: str, text: str):
+    async def trigger(cls, session_id: str, text: str, bucket_name: str = None):
         """Trigger agent with text input via HTTP POST."""
         resp = await cls._http.post(
             f"{cls._server_addr}/trigger",
-            json={"session_id": session_id, "text": text},
+            json={"session_id": session_id, "text": text, "bucket_name": bucket_name},
         )
         resp.raise_for_status()
         return resp.json()

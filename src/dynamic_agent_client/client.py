@@ -16,6 +16,7 @@ class DynamicAgentClient:
     def __init__(self):
         self.session_id: str | None = None
         self.websocket = None
+        self.messages: list = []
 
         self._on_stream: Callable[[str], None] | None = None
         self._on_invoke: Callable[[str], None] | None = None
@@ -34,11 +35,11 @@ class DynamicAgentClient:
         await ServiceHandler.connect(server_addr)
 
     @classmethod
-    async def create(cls, setting: str, messages: list = None, reconnect_keep: int = 30, bucket_name: str = None) -> "DynamicAgentClient":
+    async def create(cls, setting: str, reconnect_keep: int = 30) -> "DynamicAgentClient":
         """Create a new session with the Dynamic Agent service."""
         instance = cls()
-        instance.session_id, instance.websocket = await ServiceHandler.create_session(
-            setting, instance, messages=messages or [], reconnect_keep=reconnect_keep, bucket_name=bucket_name
+        instance.session_id, instance.websocket, instance.messages = await ServiceHandler.create_session(
+            setting, instance, reconnect_keep=reconnect_keep
         )
         instance._listen_task = asyncio.ensure_future(instance._listen())
         return instance
@@ -76,6 +77,7 @@ class DynamicAgentClient:
         text: str,
         on_stream: Callable[[str], None] = None,
         on_invoke: Callable[[str], None] = None,
+        bucket_name: str = None,
     ):
         await self._ensure_connected()
 
@@ -86,7 +88,7 @@ class DynamicAgentClient:
         self._response_done.clear()
 
         # Fire HTTP trigger, response streams via WebSocket
-        await ServiceHandler.trigger(self.session_id, text)
+        await ServiceHandler.trigger(self.session_id, text, bucket_name=bucket_name)
         # Wait for streaming response to complete
         await self._response_done.wait()
         result = self._accumulated_text
