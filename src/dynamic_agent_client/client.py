@@ -49,6 +49,7 @@ class DynamicAgentClient:
         try:
             async for message in self.websocket:
                 data = json.loads(message)
+
                 if data.get("type") == "agent_chunk":
                     text = data["text"]
 
