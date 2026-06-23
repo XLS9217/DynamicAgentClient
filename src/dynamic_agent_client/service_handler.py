@@ -241,7 +241,28 @@ class ServiceHandler:
                 print(f"[webhook] ERROR: {error_msg}")
                 return f"Error: {error_msg}"
 
-            result = callable_func(**arguments)
+            # Hook: before tool execution
+            if client._on_tool_call:
+                try:
+                    client._on_tool_call(tool_name, arguments)
+                except Exception as e:
+                    print(f"[webhook] WARNING: on_tool_call hook failed: {e}")
+
+            # Execute tool
+            try:
+                result = callable_func(**arguments)
+            except Exception as e:
+                error_msg = f"Tool execution failed: {e}"
+                print(f"[webhook] ERROR: {error_msg}")
+                return f"Error: {error_msg}"
+
+            # Hook: after tool execution
+            if client._on_tool_result:
+                try:
+                    client._on_tool_result(tool_name, arguments, result)
+                except Exception as e:
+                    print(f"[webhook] WARNING: on_tool_result hook failed: {e}")
+
             return str(result)
 
         config = uvicorn.Config(

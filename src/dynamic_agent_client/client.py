@@ -20,6 +20,8 @@ class DynamicAgentClient:
 
         self._on_stream: Callable[[str], None] | None = None
         self._on_invoke: Callable[[str], None] | None = None
+        self._on_tool_call: Callable[[str, dict], None] | None = None
+        self._on_tool_result: Callable[[str, dict, any], None] | None = None
         self._accumulated_text = ""
         self._invoke_text = ""
         self._response_done = asyncio.Event()
@@ -100,6 +102,41 @@ class DynamicAgentClient:
         if not isinstance(operator, AgentOperator):
             raise TypeError("operator must be an AgentOperator instance")
         return await ServiceHandler.add_operator(self.session_id, self, operator)
+
+    def on_tool_call(self, callback: Callable[[str, dict], None]):
+        """
+        Set callback for when a tool is about to execute.
+
+        The callback receives:
+        - tool_name (str): The name of the tool being called
+        - arguments (dict): The arguments passed to the tool
+
+        Example:
+            def log_tool_call(tool_name: str, arguments: dict):
+                print(f"Calling {tool_name} with {arguments}")
+
+            client.on_tool_call(log_tool_call)
+        """
+        self._on_tool_call = callback
+        return self
+
+    def on_tool_result(self, callback: Callable[[str, dict, any], None]):
+        """
+        Set callback for after a tool execution completes.
+
+        The callback receives:
+        - tool_name (str): The name of the tool that was called
+        - arguments (dict): The arguments that were passed to the tool
+        - result (any): The return value from the tool
+
+        Example:
+            def log_tool_result(tool_name: str, arguments: dict, result: any):
+                print(f"{tool_name} returned: {result}")
+
+            client.on_tool_result(log_tool_result)
+        """
+        self._on_tool_result = callback
+        return self
 
     @classmethod
     async def create_bucket(cls, name: str, description: str = ""):
