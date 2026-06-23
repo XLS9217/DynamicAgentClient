@@ -175,7 +175,7 @@ class DynamicAgentClient:
             self.websocket = None
 
         if self.session_id:
-            ServiceHandler.unregister_client(self.session_id)
+            ServiceHandler.unregister_client(self.session_id, client_instance=self)
             self.session_id = None
 
     async def __aenter__(self):

@@ -73,6 +73,9 @@ class ServiceHandler:
         socket_url = data["socket_url"]
         messages = data["messages"]
 
+        # Always register/update client - last client wins
+        # This handles React strict mode double mount: the second (active) client
+        # replaces the first (stale) client that may be garbage collected
         cls._clients[session_id] = client
 
         ws = await websockets.connect(socket_url)
@@ -182,7 +185,19 @@ class ServiceHandler:
         return ws
 
     @classmethod
-    def unregister_client(cls, session_id: str):
+    def unregister_client(cls, session_id: str, client_instance=None):
+        """
+        Unregister a client from the session.
+
+        If client_instance is provided, only unregister if the current registered
+        client matches it (prevents stale client from unregistering active client).
+        """
+        if client_instance is not None:
+            current = cls._clients.get(session_id)
+            if current is not client_instance:
+                # Don't unregister - a different client instance has taken over
+                return
+
         cls._clients.pop(session_id, None)
 
     @classmethod
@@ -196,6 +211,18 @@ class ServiceHandler:
             session_id = data.get("session_id")
             client = cls._clients.get(session_id)
 
+            # Defensive: check if client exists
+            if client is None:
+                error_msg = f"Client not found for session {session_id}"
+                print(f"[webhook] ERROR: {error_msg}")
+                return f"Error: {error_msg}"
+
+            # Defensive: check if tool_map is initialized
+            if not hasattr(client, 'tool_map') or client.tool_map is None:
+                error_msg = f"Client tool_map not initialized for session {session_id}"
+                print(f"[webhook] ERROR: {error_msg}")
+                return f"Error: {error_msg}"
+
             tool_name = data.get("name", "")
             arguments = json.loads(_sanitize_json(data.get("arguments", "{}")))
 
@@ -207,6 +234,13 @@ class ServiceHandler:
                         pass
 
             callable_func = client.tool_map.get(tool_name)
+
+            # Defensive: check if tool exists
+            if callable_func is None:
+                error_msg = f"Tool '{tool_name}' not found in session {session_id}"
+                print(f"[webhook] ERROR: {error_msg}")
+                return f"Error: {error_msg}"
+
             result = callable_func(**arguments)
             return str(result)
 
