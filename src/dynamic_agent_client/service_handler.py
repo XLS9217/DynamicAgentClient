@@ -252,11 +252,10 @@ class ServiceHandler:
             try:
                 result = callable_func(**arguments)
             except Exception as e:
-                error_msg = f"Tool execution failed: {e}"
-                print(f"[webhook] ERROR: {error_msg}")
-                return f"Error: {error_msg}"
+                result = f"Error: Tool execution failed: {e}"
+                print(f"[webhook] ERROR: {result}")
 
-            # Hook: after tool execution
+            # Hook: after tool execution (fires for success AND error)
             if client._on_tool_result:
                 try:
                     client._on_tool_result(tool_name, arguments, result)
