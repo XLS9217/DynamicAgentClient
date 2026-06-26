@@ -114,6 +114,17 @@ class ServiceHandler:
         return resp.json()
 
     @classmethod
+    async def delete_session(cls, session_id: str) -> bool:
+        """Delete a session's persisted chat messages via HTTP DELETE."""
+        resp = await cls._http.delete(
+            f"{cls._server_addr}/session/{session_id}",
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        cls._clients.pop(session_id, None)
+        return data.get("status") == "ok"
+
+    @classmethod
     async def create_bucket(cls, name: str, description: str = ""):
         """Create a new bucket via HTTP POST."""
         resp = await cls._http.post(

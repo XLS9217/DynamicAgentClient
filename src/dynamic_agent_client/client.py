@@ -103,6 +103,11 @@ class DynamicAgentClient:
             raise TypeError("operator must be an AgentOperator instance")
         return await ServiceHandler.add_operator(self.session_id, self, operator)
 
+    @classmethod
+    async def delete_session(cls, session_id: str) -> bool:
+        """Delete persisted chat messages for a session."""
+        return await ServiceHandler.delete_session(session_id)
+
     def on_tool_call(self, callback: Callable[[str, dict], None]):
         """
         Set callback for when a tool is about to execute.
